@@ -186,39 +186,27 @@ export default function StudentDashboard() {
 
                     <div style={{ padding:'0 20px 20px', marginTop:'auto' }}>
                       <button
-  onClick={async () => {
-
-    const elem = document.documentElement;
-    if (localStorage.getItem("exam_active")) {
-    alert("Exam already running in another tab");
-    return;
-    }
-    localStorage.setItem("exam_active", "true");
-    if (elem.requestFullscreen) {
-      try {
-        await elem.requestFullscreen();
-      } catch (err) {
-        console.warn("Fullscreen request failed:", err);
-      }
-    }
-
-    navigate('/exam/' + exam.id);
-
-  }}
-  style={{
-    width:'100%',
-    padding:'10px',
-    background:'var(--primary)',
-    color:'#fff',
-    border:'none',
-    borderRadius:6,
-    fontSize:14,
-    fontWeight:600,
-    cursor:'pointer'
-  }}
->
-  Start Exam
-</button>
+                        onClick={() => {
+                          if (localStorage.getItem('exam_active')) {
+                            alert('Exam already running in another tab');
+                            return;
+                          }
+                          navigate('/exam/' + exam.id);
+                        }}
+                        style={{
+                          width:'100%',
+                          padding:'10px',
+                          background:'var(--primary)',
+                          color:'#fff',
+                          border:'none',
+                          borderRadius:6,
+                          fontSize:14,
+                          fontWeight:600,
+                          cursor:'pointer'
+                        }}
+                      >
+                        Start Exam
+                      </button>
                     </div>
 
                   </div>

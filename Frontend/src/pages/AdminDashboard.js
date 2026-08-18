@@ -428,12 +428,16 @@ function DeleteAttemptsTab({ flash }) {
   };
 
   const handleLogoutAllUsers = async () => {
-    if (!window.confirm('Logout every active user session across the platform?')) return;
+    if (!window.confirm('Logout all users EXCEPT your admin session?')) return;
     setLogoutAllLoading(true);
     try {
       const res = await logoutAllUsers();
       const count = res.data?.data?.loggedOutUsers ?? 0;
-      flash(`Logged out ${count} active sessions.`, true);
+      const adminPreserved = res.data?.data?.adminPreserved ?? false;
+      const message = adminPreserved 
+        ? `Logged out ${count} active sessions. Your admin session remains active.`
+        : `Logged out ${count} active sessions.`;
+      flash(message, true);
     } catch (err) {
       flash(err.response?.data?.message || 'Failed to logout all users.', false);
     } finally {

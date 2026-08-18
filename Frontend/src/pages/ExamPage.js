@@ -95,7 +95,7 @@ export default function ExamPage() {
   const { user }   = useAuth();
 
   const [session,     setSession]     = useState(null);
-  const [loading,     setLoading]     = useState(true);
+  const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState('');
   const [currentIdx,  setCurrentIdx]  = useState(0);
   const [answers,     setAnswers]     = useState({});
@@ -106,6 +106,8 @@ export default function ExamPage() {
   const [submitted,   setSubmitted]   = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [snackbar,    setSnackbar]    = useState('');
+  const [showInstructions, setShowInstructions] = useState(true);
+  const [startingExam, setStartingExam] = useState(false);
 
   /* ── FULLSCREEN STATE ────────────────────────────────────────── */
   const [fsWarning,   setFsWarning]   = useState(null);  // { graceSeconds, exitsRemaining }
@@ -138,27 +140,40 @@ export default function ExamPage() {
     return next;
   }, []);
 
-  /* ── LOAD SESSION ───────────────────────────────────────────── */
-  useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
+  const handleStartExam = useCallback(async () => {
+    if (startingExam || !examId) return;
 
-    startExam(examId)
-      .then(res => {
-        const s = res.data.data || res.data;
-        setSession(s);
-        if (s.savedAnswers)  setAnswers(s.savedAnswers);
-        if (s.markedForReview) setMarked(s.markedForReview);
-        if (s.sections)      setActiveSection(Object.keys(s.sections)[0]);
-        setVisited(new Set());
-      })
-      .catch(err => {
-        // Release stale lock if backend rejects start (e.g. already submitted).
-        localStorage.removeItem('exam_active');
-        setError(err.response?.data?.message || 'Failed to start exam.');
-      })
-      .finally(() => setLoading(false));
-  }, [examId]);
+    setStartingExam(true);
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await startExam(examId);
+      const s = res.data.data || res.data;
+      setSession(s);
+      setShowInstructions(false);
+      setVisited(new Set());
+      if (s.savedAnswers) setAnswers(s.savedAnswers);
+      if (s.markedForReview) setMarked(s.markedForReview);
+      if (s.sections) setActiveSection(Object.keys(s.sections)[0]);
+      localStorage.setItem('exam_active', 'true');
+
+      try {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        }
+      } catch (e) {
+        console.warn('Fullscreen request failed:', e);
+      }
+    } catch (err) {
+      localStorage.removeItem('exam_active');
+      setShowInstructions(true);
+      setError(err.response?.data?.message || 'Failed to start exam.');
+    } finally {
+      setLoading(false);
+      setStartingExam(false);
+    }
+  }, [examId, startingExam]);
 
   /* ── ENTER FULLSCREEN ON SESSION LOAD ───────────────────────── */
   useEffect(() => {
@@ -306,6 +321,120 @@ export default function ExamPage() {
     if (!session || !activeSection) return Array.from({length: session?.questions?.length || 0}, (_,i) => i);
     return session.sections[activeSection] || [];
   };
+
+  if (showInstructions) return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: 980,
+        background: '#fff',
+        borderRadius: 20,
+        boxShadow: '0 24px 80px rgba(15, 23, 42, 0.12)',
+        border: '1px solid #e2e8f0',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          background: 'linear-gradient(90deg, #1e3a5f 0%, #0f172a 100%)',
+          color: '#fff',
+          padding: '26px 28px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+            <BrandLogo size={34} />
+            <div>
+              <div style={{ fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', opacity: 0.8 }}>Exam Instructions</div>
+              <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800 }}>Before You Begin</h1>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: '28px 28px 20px', color: '#1f2937' }}>
+          <div style={{ marginBottom: 24 }}>
+            <h2 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 800, color: '#0f172a' }}>General Rules</h2>
+            <ol style={{ margin: 0, paddingLeft: 22, lineHeight: 1.9, fontSize: 15, color: '#334155' }}>
+              <li>Read all instructions carefully before starting the examination.</li>
+              <li>The examination will begin only after you click “Start Exam.”</li>
+              <li>The timer will start immediately after the examination begins.</li>
+              <li>The examination will be automatically submitted when the allotted time expires.</li>
+              <li>Once the examination is submitted, answers cannot be modified.</li>
+            </ol>
+          </div>
+
+          <div style={{ marginBottom: 24, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 18 }}>
+            <h2 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 800, color: '#991b1b' }}>Important</h2>
+            <ul style={{ margin: 0, paddingLeft: 22, lineHeight: 1.9, fontSize: 15, color: '#7f1d1d' }}>
+              <li><strong>Do not refresh, close, or navigate away from the examination window.</strong></li>
+              <li><strong>Right-click is disabled during the examination.</strong></li>
+              <li><strong>Copy, cut, and paste operations are disabled.</strong></li>
+              <li><strong>Don’t try any type of keyboard shortcut. This may cause a violation of the exam and the exam will be submitted.</strong></li>
+            </ul>
+          </div>
+
+          <div style={{ marginBottom: 28 }}>
+            <h2 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 800, color: '#0f172a' }}>Answer Submission</h2>
+            <ol style={{ margin: 0, paddingLeft: 22, lineHeight: 1.9, fontSize: 15, color: '#334155' }}>
+              <li>Your answer is saved when you select an option.</li>
+              <li>You may change your answer at any time before submission.</li>
+              <li>Selecting Submit Exam will permanently submit your examination.</li>
+              <li>After final submission, you cannot return to the examination.</li>
+              <li>If the timer reaches zero, the system will automatically submit your examination.</li>
+            </ol>
+          </div>
+
+          {error && (
+            <div style={{ marginBottom: 20, padding: '12px 14px', borderRadius: 10, background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', fontWeight: 600 }}>
+              {error}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button
+              onClick={handleStartExam}
+              disabled={startingExam}
+              style={{
+                flex: 1,
+                minWidth: 220,
+                padding: '14px 22px',
+                border: 'none',
+                borderRadius: 10,
+                cursor: startingExam ? 'not-allowed' : 'pointer',
+                background: 'linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)',
+                color: '#fff',
+                fontSize: 16,
+                fontWeight: 800,
+                boxShadow: '0 10px 24px rgba(37, 99, 235, 0.25)',
+                opacity: startingExam ? 0.8 : 1
+              }}
+            >
+              {startingExam ? 'Starting Exam...' : 'Start Exam'}
+            </button>
+
+            <button
+              onClick={() => navigate('/student')}
+              style={{
+                padding: '14px 20px',
+                border: '1px solid #cbd5e1',
+                borderRadius: 10,
+                background: '#fff',
+                color: '#334155',
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   /* ── LOADING / ERROR ─────────────────────────────────────────── */
   if (loading) return (
